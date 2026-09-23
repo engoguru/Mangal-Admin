@@ -1,0 +1,133 @@
+:root{
+  --color-212529: #212529;
+  --color-1677FF: #1677FF;
+  --color-47ad24: #47ad24;
+  --color-e52e2e: #e52e2e;
+  --color-828599: #828599;
+  --color-3d464d: #3d464d;
+  --color-ced4da: #ced4da;
+}
+
+.green{
+  color: var(--color-47ad24);
+  font-size: 14px;
+}
+
+.red{
+  color: var(--color-e52e2e);
+  font-size: 14px;
+}
+
+.quill{
+  background-color: #fff;
+  background-color: #fff;
+}
+
+.form-control{
+  box-shadow: none;
+  border-color: var(--color-ced4da);
+}
+
+.title{
+  font: 28px;
+  font-family: Roboto !important;
+  color: var(--color-212529);
+}
+
+.sub-title{
+  font: 24px;
+  font-family: Roboto !important;
+  color: var(--color-212529) !important;
+}
+
+.desc{
+  font: 14px;
+  font-family: Roboto !important;
+  color: var(--color-828599);
+}
+
+
+.search-form-container {
+  margin-top: 30px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.search-form {
+  width: 100%;
+  max-width: 800px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.ant-form-item {
+  flex: 1 1 calc(50% - 20px); /* Adjust item width */
+  min-width: 200px;
+}
+
+.ant-input,
+.ant-picker {
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.ant-btn {
+  background-color: #1890ff;
+  border-color: #1890ff;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-weight: bold;
+}
+
+.ant-btn:hover {
+  background-color: #40a9ff;
+  border-color: #40a9ff;
+}
+
+@media (max-width: 768px) {
+  .search-form {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ant-form-item {
+    flex: 1 1 100%;
+  }
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.page-item {
+  margin: 0 5px;
+}
+
+.page-link {
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #007bff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.page-link:hover {
+  background-color: #007bff;
+  color: #fff;
+}
+
+.page-item.active .page-link {
+  background-color: #007bff;
+  color: white;
+  border-color: #007bff;
+}
