@@ -1887,1261 +1887,642 @@
 
 
 
-import React, {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-
+import React, { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
+import axios from "axios";
 
 import { base_booking_url2 } from "../../utils/base_url";
 import { config } from "../../utils/axiosconfig";
 
 function ScannerMain() {
-  const [scannerOpen, setScannerOpen] =
-    useState(false);
-
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [booking, setBooking] = useState(null);
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const [checkingIn, setCheckingIn] =
-    useState(false);
-
-  const [errorMessage, setErrorMessage] =
-    useState("");
-
-  const [authorityMessage, setAuthorityMessage] =
-    useState("");
+  const [loading, setLoading] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [authorityMessage, setAuthorityMessage] = useState("");
 
   const scannerRef = useRef(null);
   const scannedRef = useRef(false);
 
-  // =====================================================
-  // OPEN SCANNER
-  // =====================================================
-
-  const openScanner = () => {
-    setBooking(null);
-    setErrorMessage("");
-    setAuthorityMessage("");
-    setLoading(false);
-    setCheckingIn(false);
-
-    scannedRef.current = false;
-
-    setScannerOpen(true);
+  const getApiUrl = (type, id) => {
+    const baseUrl = base_booking_url2.replace(/\/$/, "");
+    return `${baseUrl}/qr/verify/${encodeURIComponent(type)}/${encodeURIComponent(id)}`;
   };
-
-  // =====================================================
-  // PARSE QR URL
-  // =====================================================
 
   const getVerifyDetails = (qrUrl) => {
     try {
       const url = new URL(qrUrl);
+      const parts = url.pathname.split("/").filter(Boolean);
+      const index = parts.indexOf("verify");
 
-      const parts = url.pathname
-        .split("/")
-        .filter(Boolean);
-
-      const verifyIndex =
-        parts.indexOf("verify");
-
-      if (
-        verifyIndex === -1 ||
-        !parts[verifyIndex + 1] ||
-        !parts[verifyIndex + 2]
-      ) {
+      if (index === -1 || !parts[index + 1] || !parts[index + 2]) {
         return null;
       }
 
-      const type =
-        parts[verifyIndex + 1];
-
-      const id =
-        parts[verifyIndex + 2];
-
       return {
-        type,
-        id,
+        type: parts[index + 1],
+        id: parts[index + 2],
       };
-    } catch (error) {
-      console.error(
-        "QR URL PARSE ERROR:",
-        error
-      );
-
+    } catch {
       return null;
     }
   };
 
-  // =====================================================
-  // CREATE API URL
-  // =====================================================
-
-  const getApiUrl = (type, id) => {
-    const baseUrl =
-      base_booking_url2.replace(/\/$/, "");
-
-    return `${baseUrl}/qr/verify/${encodeURIComponent(
-      type
-    )}/${encodeURIComponent(id)}`;
+  const resetMessages = () => {
+    setErrorMessage("");
+    setAuthorityMessage("");
   };
 
-  // =====================================================
-  // LOAD BOOKING
-  // GET = ONLY FETCH DETAILS
-  // =====================================================
+  const openScanner = () => {
+    setBooking(null);
+    resetMessages();
+    setLoading(false);
+    setCheckingIn(false);
+    scannedRef.current = false;
+    setScannerOpen(true);
+  };
 
   const loadBooking = async (qrUrl) => {
     if (!qrUrl) {
-      setErrorMessage(
-        "No QR code was scanned."
-      );
-
+      setErrorMessage("No QR code was scanned.");
       return;
     }
 
+    const qrDetails = getVerifyDetails(qrUrl);
+
+    if (!qrDetails) {
+      setErrorMessage("Invalid QR code. Please scan a valid booking QR.");
+      return;
+    }
+
+    const { type, id } = qrDetails;
+    const apiUrl = getApiUrl(type, id);
+
     setLoading(true);
     setBooking(null);
-    setErrorMessage("");
-    setAuthorityMessage("");
+    resetMessages();
 
     try {
-      const qrDetails =
-        getVerifyDetails(qrUrl);
+      console.log("GET:", apiUrl);
 
-      if (!qrDetails) {
-        throw new Error(
-          "Invalid QR code. Please scan a valid booking QR."
-        );
-      }
+      // Axios automatically uses your existing auth config.
+      const response = await axios.get(apiUrl, config);
+      const result = response.data;
 
-      const { type, id } =
-        qrDetails;
+      console.log("VERIFY RESPONSE:", result);
 
-      const apiUrl =
-        getApiUrl(type, id);
-
-      console.log(
-        "================================"
-      );
-
-      console.log("QR SCANNED");
-
-      console.log("TYPE:", type);
-
-      console.log("ID:", id);
-
-      console.log("GET API:", apiUrl);
-
-      console.log(
-        "================================"
-      );
-
-      const response = await fetch(
-        apiUrl,
-        {
-          method: "GET",
-     headers: config.headers,
-          // headers: {
-          //   Accept:
-          //     "application/json",
-          // },
-        }
-      );
-
-      let result;
-
-      try {
-        result =
-          await response.json();
-      } catch {
-        throw new Error(
-          "Server returned an invalid response."
-        );
-      }
-
-      console.log(
-        "VERIFY RESPONSE:",
-        result
-      );
-
-      // -------------------------------------------------
-      // API ERROR
-      // -------------------------------------------------
-
-      if (
-        !response.ok ||
-        !result.success
-      ) {
-        if (
-          result?.requiresAuthority
-        ) {
+      if (!result.success) {
+        if (result.requiresAuthority) {
           setAuthorityMessage(
-            result.message ||
-              "Please refer to higher authority."
+            result.message || "Please refer to higher authority."
           );
         } else {
           setErrorMessage(
-            result?.message ||
-              "Unable to find this booking."
+            result.message || "Unable to find this booking."
           );
         }
 
-        if (result?.data) {
+        if (result.data) {
           setBooking({
             ...result.data,
-
             qrType: type,
             qrId: id,
+            verifyUrl: apiUrl,
           });
-        } else {
-          setBooking(null);
         }
 
         return;
       }
 
-      // -------------------------------------------------
-      // SUCCESS
-      // -------------------------------------------------
-
       if (!result.data) {
-        throw new Error(
-          "Booking data not found."
-        );
+        throw new Error("Booking data not found.");
       }
 
       setBooking({
         ...result.data,
-
         qrType: type,
         qrId: id,
-
         verifyUrl: apiUrl,
       });
     } catch (error) {
-      console.error(
-        "LOAD BOOKING ERROR:",
-        error
-      );
+      console.error("LOAD BOOKING ERROR:", error);
 
-      setBooking(null);
+      const data = error?.response?.data;
 
-      setErrorMessage(
-        error?.message ||
-          "Unable to load booking details."
-      );
+      if (data?.data) {
+        setBooking({
+          ...data.data,
+          qrType: type,
+          qrId: id,
+          verifyUrl: apiUrl,
+        });
+      }
+
+      if (data?.requiresAuthority) {
+        setAuthorityMessage(
+          data.message || "Please refer to higher authority."
+        );
+      } else {
+        setErrorMessage(
+          data?.message ||
+            error?.message ||
+            "Unable to load booking details."
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // =====================================================
-  // HANDLE QR SCAN
-  // =====================================================
-
-  const handleQrScan = async (
-    decodedText
-  ) => {
-    if (scannedRef.current) {
-      return;
-    }
+  const handleQrScan = async (decodedText) => {
+    if (scannedRef.current) return;
 
     scannedRef.current = true;
 
-    console.log(
-      "QR RESULT:",
-      decodedText
-    );
-
-    // Stop camera immediately
     try {
       if (scannerRef.current) {
         await scannerRef.current.stop();
       }
     } catch (error) {
-      console.log(
-        "Scanner stop error:",
-        error
-      );
+      console.log("Scanner stop:", error);
     }
 
     scannerRef.current = null;
-
-    // Hide scanner
     setScannerOpen(false);
 
-    // Fetch booking
     await loadBooking(decodedText);
   };
 
-  // =====================================================
-  // START SCANNER
-  // =====================================================
-
   useEffect(() => {
-    if (!scannerOpen) {
-      return;
-    }
+    if (!scannerOpen) return;
 
     let mounted = true;
 
-    const scanner =
-      new Html5Qrcode(
-        "qr-reader"
-      );
-
-    scannerRef.current =
-      scanner;
-
+    const scanner = new Html5Qrcode("qr-reader");
+    scannerRef.current = scanner;
     scannedRef.current = false;
 
-    const startScanner =
-      async () => {
-        try {
-          await scanner.start(
-            {
-              facingMode:
-                "environment",
-            },
-
-            {
-              fps: 10,
-
-              qrbox: {
-                width: 250,
-                height: 250,
-              },
-
-              aspectRatio: 1,
-            },
-
-            async (
-              decodedText
-            ) => {
-              if (!mounted) {
-                return;
-              }
-
-              await handleQrScan(
-                decodedText
-              );
-            },
-
-            () => {
-              // Scanner keeps checking.
-              // No need to show scan errors.
+    const start = async () => {
+      try {
+        await scanner.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1,
+          },
+          async (decodedText) => {
+            if (mounted) {
+              await handleQrScan(decodedText);
             }
-          );
-        } catch (error) {
-          console.error(
-            "CAMERA ERROR:",
-            error
-          );
+          },
+          () => {}
+        );
+      } catch (error) {
+        console.error("CAMERA ERROR:", error);
 
-          if (!mounted) {
-            return;
-          }
-
+        if (mounted) {
           setScannerOpen(false);
-
           setErrorMessage(
             "Unable to open camera. Please allow camera permission and try again."
           );
-
-          scannerRef.current =
-            null;
         }
-      };
 
-    startScanner();
+        scannerRef.current = null;
+      }
+    };
 
-    // =================================================
-    // CLEANUP
-    // =================================================
+    start();
 
     return () => {
       mounted = false;
 
-      const cleanup =
-        async () => {
-          try {
-            if (
-              scannerRef.current
-            ) {
-              await scannerRef.current.stop();
-            }
-          } catch (error) {
-            console.log(
-              "Scanner cleanup:",
-              error
-            );
+      const stopScanner = async () => {
+        try {
+          if (scannerRef.current) {
+            await scannerRef.current.stop();
           }
+        } catch (error) {
+          console.log("Scanner cleanup:", error);
+        }
 
-          scannerRef.current =
-            null;
-        };
+        scannerRef.current = null;
+      };
 
-      cleanup();
+      stopScanner();
     };
   }, [scannerOpen]);
 
-  // =====================================================
-  // UPDATE / CHECK IN
-  // PATCH
-  // =====================================================
+  const updateBooking = async () => {
+    if (!booking || checkingIn) return;
 
-  const updateBooking =
-    async () => {
-      if (!booking) {
-        return;
-      }
+    const { qrType: type, qrId: id } = booking;
 
-      const type =
-        booking.qrType;
+    if (!type || !id) {
+      setErrorMessage("Booking information is incomplete.");
+      return;
+    }
 
-      const id =
-        booking.qrId;
+    const status = String(booking.status || "").toLowerCase();
 
-      if (!type || !id) {
-        setErrorMessage(
-          "Booking information is incomplete."
-        );
+    if (status === "completed") {
+      return;
+    }
 
-        return;
-      }
+    if (status === "cancelled") {
+      setAuthorityMessage(
+        "This booking is cancelled. Please refer to higher authority."
+      );
+      return;
+    }
 
-      // Already completed
-      if (
-        booking.status ===
-        "completed"
-      ) {
-        return;
-      }
+    if (status !== "pending") {
+      setAuthorityMessage(
+        "This booking cannot be checked in. Please refer to higher authority."
+      );
+      return;
+    }
 
-      // Cancelled
-      if (
-        booking.status ===
-        "cancelled"
-      ) {
-        setAuthorityMessage(
-          "This booking is cancelled. Please refer to higher authority."
-        );
+    setCheckingIn(true);
+    resetMessages();
 
-        return;
-      }
+    try {
+      const apiUrl = getApiUrl(type, id);
 
-      setCheckingIn(true);
-      setErrorMessage("");
-      setAuthorityMessage("");
+      console.log("PATCH:", apiUrl);
 
-      try {
-        const apiUrl =
-          getApiUrl(
-            type,
-            id
+      // Same authenticated config used by your working Axios API.
+      const response = await axios.patch(apiUrl, {}, config);
+      const result = response.data;
+
+      console.log("CHECK-IN RESPONSE:", result);
+
+      if (!result.success) {
+        if (result.requiresAuthority) {
+          setAuthorityMessage(
+            result.message || "Please refer to higher authority."
           );
-
-        console.log(
-          "================================"
-        );
-
-        console.log(
-          "CHECK-IN"
-        );
-
-        console.log(
-          "PATCH API:",
-          apiUrl
-        );
-
-        console.log(
-          "================================"
-        );
-
-        const response =
-          await fetch(
-            apiUrl,
-            {
-              method: "PATCH",
- headers: config.headers,
-              // headers: {
-              //   Accept:
-              //     "application/json",
-
-              //   "Content-Type":
-              //     "application/json",
-              // },
-            }
-          );
-
-        let result;
-
-        try {
-          result =
-            await response.json();
-        } catch {
-          throw new Error(
-            "Server returned an invalid response."
+        } else {
+          setErrorMessage(
+            result.message || "Unable to update booking."
           );
         }
 
-        console.log(
-          "CHECK-IN RESPONSE:",
-          result
-        );
-
-        // -------------------------------------------------
-        // HIGHER AUTHORITY
-        // -------------------------------------------------
-
-        if (
-          !response.ok ||
-          !result.success
-        ) {
-          if (
-            result?.requiresAuthority
-          ) {
-            setAuthorityMessage(
-              result.message ||
-                "Please refer to higher authority."
-            );
-          } else {
-            setErrorMessage(
-              result?.message ||
-                "Unable to update booking."
-            );
-          }
-
-          // Backend may return latest booking data
-          if (result?.data) {
-            setBooking(
-              (
-                previous
-              ) => ({
-                ...previous,
-                ...result.data,
-
-                qrType: type,
-                qrId: id,
-              })
-            );
-          }
-
-          return;
+        if (result.data) {
+          setBooking((prev) => ({
+            ...prev,
+            ...result.data,
+            qrType: type,
+            qrId: id,
+            verifyUrl: apiUrl,
+          }));
         }
 
-        // -------------------------------------------------
-        // CHECK-IN SUCCESS
-        // -------------------------------------------------
+        return;
+      }
 
-        if (!result.data) {
-          throw new Error(
-            "Updated booking data not received."
-          );
-        }
+      if (!result.data) {
+        throw new Error("Updated booking data not received.");
+      }
 
-        setBooking({
-          ...result.data,
+      setBooking({
+        ...result.data,
+        qrType: type,
+        qrId: id,
+        verifyUrl: apiUrl,
+      });
+    } catch (error) {
+      console.error("CHECK-IN ERROR:", error);
 
+      const data = error?.response?.data;
+
+      if (data?.data) {
+        setBooking((prev) => ({
+          ...prev,
+          ...data.data,
           qrType: type,
           qrId: id,
+        }));
+      }
 
-          verifyUrl: apiUrl,
-        });
-      } catch (error) {
-        console.error(
-          "CHECK-IN ERROR:",
-          error
+      if (data?.requiresAuthority) {
+        setAuthorityMessage(
+          data.message || "Please refer to higher authority."
         );
-
+      } else {
         setErrorMessage(
-          error?.message ||
+          data?.message ||
+            error?.message ||
             "Unable to update booking."
         );
-      } finally {
-        setCheckingIn(false);
       }
-    };
+    } finally {
+      setCheckingIn(false);
+    }
+  };
 
-  // =====================================================
-  // CLOSE SCANNER
-  // =====================================================
-
-  const closeScanner =
-    async () => {
-      try {
-        if (
-          scannerRef.current
-        ) {
-          await scannerRef.current.stop();
-        }
-      } catch (error) {
-        console.log(
-          "Scanner close error:",
-          error
-        );
+  const closeScanner = async () => {
+    try {
+      if (scannerRef.current) {
+        await scannerRef.current.stop();
       }
+    } catch (error) {
+      console.log("Scanner close:", error);
+    }
 
-      scannerRef.current =
-        null;
-
-      scannedRef.current =
-        false;
-
-      setScannerOpen(false);
-    };
-
-  // =====================================================
-  // SCAN AGAIN
-  // =====================================================
+    scannerRef.current = null;
+    scannedRef.current = false;
+    setScannerOpen(false);
+  };
 
   const scanAgain = () => {
     setBooking(null);
-
-    setErrorMessage("");
-
-    setAuthorityMessage("");
-
+    resetMessages();
     setLoading(false);
-
     setCheckingIn(false);
-
-    scannedRef.current =
-      false;
-
+    scannedRef.current = false;
     setScannerOpen(true);
   };
 
-  // =====================================================
-  // STATUS BADGE
-  // =====================================================
+  const formatDate = (date) => {
+    if (!date) return "-";
 
-  const renderStatusBadge =
-    (status) => {
-      const currentStatus =
-        String(
-          status || ""
-        ).toLowerCase();
+    const value = new Date(date);
 
-      if (
-        currentStatus ===
-        "pending"
-      ) {
-        return (
-          <span className="badge bg-warning text-dark px-3 py-2">
-            Pending
-          </span>
-        );
-      }
+    if (Number.isNaN(value.getTime())) return "-";
 
-      if (
-        currentStatus ===
-        "completed"
-      ) {
-        return (
-          <span className="badge bg-success px-3 py-2">
-            Completed
-          </span>
-        );
-      }
+    return value.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
 
-      if (
-        currentStatus ===
-        "cancelled"
-      ) {
-        return (
-          <span className="badge bg-danger px-3 py-2">
-            Cancelled
-          </span>
-        );
-      }
+  const formatDateTime = (date) => {
+    if (!date) return "-";
 
+    const value = new Date(date);
+
+    if (Number.isNaN(value.getTime())) return "-";
+
+    return value.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const formatAmount = (amount) => {
+    if (amount === null || amount === undefined || amount === "") {
+      return "-";
+    }
+
+    const value = Number(amount);
+
+    if (Number.isNaN(value)) return amount;
+
+    return `₹${value.toLocaleString("en-IN")}`;
+  };
+
+  const status = String(booking?.status || "").toLowerCase();
+
+  const statusBadge = () => {
+    if (status === "pending") {
       return (
-        <span className="badge bg-secondary px-3 py-2">
-          {status || "Unknown"}
+        <span className="badge bg-warning text-dark px-3 py-2">
+          Pending
         </span>
       );
-    };
-
-  // =====================================================
-  // FORMAT DATE
-  // =====================================================
-
-  const formatDate = (
-    date
-  ) => {
-    if (!date) {
-      return "-";
     }
 
-    try {
-      return new Date(
-        date
-      ).toLocaleDateString(
-        "en-IN",
-        {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }
+    if (status === "completed") {
+      return (
+        <span className="badge bg-success px-3 py-2">
+          Completed
+        </span>
       );
-    } catch {
-      return "-";
-    }
-  };
-
-  // =====================================================
-  // FORMAT DATE + TIME
-  // =====================================================
-
-  const formatDateTime = (
-    date
-  ) => {
-    if (!date) {
-      return "-";
     }
 
-    try {
-      return new Date(
-        date
-      ).toLocaleString(
-        "en-IN",
-        {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }
+    if (status === "cancelled") {
+      return (
+        <span className="badge bg-danger px-3 py-2">
+          Cancelled
+        </span>
       );
-    } catch {
-      return "-";
     }
+
+    return (
+      <span className="badge bg-secondary px-3 py-2">
+        {booking?.status || "Unknown"}
+      </span>
+    );
   };
 
-  // =====================================================
-  // FORMAT AMOUNT
-  // =====================================================
-
-  const formatAmount = (
-    amount
-  ) => {
-    if (
-      amount === null ||
-      amount === undefined ||
-      amount === ""
-    ) {
-      return "-";
-    }
-
-    const number =
-      Number(amount);
-
-    if (
-      Number.isNaN(number)
-    ) {
-      return amount;
-    }
-
-    return `₹${number.toLocaleString(
-      "en-IN"
-    )}`;
-  };
-
-  // =====================================================
-  // RENDER
-  // =====================================================
+  const field = (label, value, className = "col-12 col-md-6") => (
+    <div className={className}>
+      <div className="border rounded p-3 h-100">
+        <small className="text-muted d-block mb-1">{label}</small>
+        <div className="fw-semibold text-break">
+          {value || "-"}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="container-fluid py-3 py-md-4">
-
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
-      <div className="card shadow-sm border-0 mb-3 mb-md-4">
+      {/* HEADER */}
+      <div className="card border-0 shadow-sm mb-3">
         <div className="card-body p-3 p-md-4">
-
           <div className="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3">
-
             <div>
               <span className="badge bg-warning text-dark mb-2">
                 Gate Check-in
               </span>
 
-              <h3 className="fw-bold mb-1">
-                Ticket Scanner
-              </h3>
+              <h3 className="fw-bold mb-1">Ticket Scanner</h3>
 
               <p className="text-muted mb-0">
-                Scan visitor QR code to
-                verify booking and check in.
+                Scan a visitor QR code to verify the booking.
               </p>
             </div>
 
             {!scannerOpen && (
               <button
-                type="button"
-                className="btn btn-dark btn-lg px-4"
+                className="btn btn-dark btn-lg"
                 onClick={openScanner}
-                disabled={
-                  loading ||
-                  checkingIn
-                }
+                disabled={loading || checkingIn}
               >
-                <i className="fa fa-qrcode me-2"></i>
+                <i className="fa fa-qrcode me-2" />
                 Scan Ticket
               </button>
             )}
-
           </div>
-
         </div>
       </div>
 
-
-      {/* =================================================
-          ERROR MESSAGE
-      ================================================= */}
-
+      {/* ERROR */}
       {errorMessage && (
-        <div className="alert alert-danger shadow-sm mb-3">
+        <div className="alert alert-danger d-flex align-items-start gap-2">
+          <i className="fa fa-exclamation-circle fs-5 mt-1" />
 
-          <div className="d-flex align-items-start">
-
-            <i className="fa fa-exclamation-circle fs-5 me-2 mt-1"></i>
-
-            <div className="flex-grow-1">
-              <strong>
-                Unable to process
-              </strong>
-
-              <div className="mt-1">
-                {errorMessage}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="btn-close"
-              onClick={() =>
-                setErrorMessage("")
-              }
-            ></button>
-
+          <div className="flex-grow-1">
+            <strong>Unable to process</strong>
+            <div className="mt-1">{errorMessage}</div>
           </div>
 
+          <button
+            className="btn-close"
+            onClick={() => setErrorMessage("")}
+          />
         </div>
       )}
 
-
-      {/* =================================================
-          HIGHER AUTHORITY MESSAGE
-      ================================================= */}
-
+      {/* AUTHORITY */}
       {authorityMessage && (
-        <div className="alert alert-warning shadow-sm mb-3">
+        <div className="alert alert-warning d-flex align-items-start gap-2">
+          <i className="fa fa-user-shield fs-5 mt-1" />
 
-          <div className="d-flex align-items-start">
-
-            <i className="fa fa-user-shield fs-5 me-2 mt-1"></i>
-
-            <div className="flex-grow-1">
-
-              <strong>
-                Higher Authority Required
-              </strong>
-
-              <div className="mt-1">
-                {authorityMessage}
-              </div>
-
-            </div>
-
-            <button
-              type="button"
-              className="btn-close"
-              onClick={() =>
-                setAuthorityMessage("")
-              }
-            ></button>
-
+          <div className="flex-grow-1">
+            <strong>Please Refer to Higher Authority</strong>
+            <div className="mt-1">{authorityMessage}</div>
           </div>
 
+          <button
+            className="btn-close"
+            onClick={() => setAuthorityMessage("")}
+          />
         </div>
       )}
 
-
-      {/* =================================================
-          SCANNER
-      ================================================= */}
-
+      {/* SCANNER */}
       {scannerOpen && (
-        <div className="card shadow-sm border-0 mb-3">
-
+        <div className="card border-0 shadow-sm mb-3">
           <div className="card-body p-3 p-md-4">
-
-            <div className="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2 mb-3">
-
+            <div className="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-3">
               <div>
-                <h5 className="fw-semibold mb-1">
-                  Scan QR Code
-                </h5>
-
+                <h5 className="fw-semibold mb-1">Scan QR Code</h5>
                 <small className="text-muted">
-                  Place the visitor's QR code
-                  inside the scanner.
+                  Keep the QR code inside the scanning box.
                 </small>
               </div>
 
               <button
-                type="button"
                 className="btn btn-outline-danger"
                 onClick={closeScanner}
               >
                 Close
               </button>
-
             </div>
 
             <div
               id="qr-reader"
               style={{
                 width: "100%",
-                maxWidth: "500px",
+                maxWidth: "420px",
                 margin: "0 auto",
               }}
             />
-
           </div>
         </div>
       )}
 
-
-      {/* =================================================
-          LOADING
-      ================================================= */}
-
-      {loading && !scannerOpen && (
-        <div className="card shadow-sm border-0 mb-3">
-
+      {/* LOADING */}
+      {loading && (
+        <div className="card border-0 shadow-sm mb-3">
           <div className="card-body text-center py-5">
+            <div className="spinner-border text-primary mb-3" />
 
-            <div
-              className="spinner-border text-primary mb-3"
-              role="status"
-            ></div>
-
-            <h5 className="fw-semibold">
+            <h5 className="fw-semibold mb-1">
               Verifying Booking
             </h5>
 
             <p className="text-muted mb-0">
-              Please wait while we fetch the
-              booking details.
+              Please wait...
             </p>
-
           </div>
         </div>
       )}
 
-
-      {/* =================================================
-          BOOKING DETAILS
-      ================================================= */}
-
+      {/* BOOKING */}
       {booking && !loading && (
-        <div className="card shadow-sm border-0 mb-3">
-
+        <div className="card border-0 shadow-sm">
           <div className="card-body p-3 p-md-4">
-
-            {/* -------------------------------------------
-                BOOKING HEADER
-            -------------------------------------------- */}
-
-            <div className="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 border-bottom pb-3 mb-4">
-
+            {/* TITLE */}
+            <div className="d-flex flex-column flex-sm-row justify-content-between align-items-start gap-2 border-bottom pb-3 mb-4">
               <div>
-                <h4 className="fw-bold mb-1">
-                  Booking Details
-                </h4>
-
+                <h4 className="fw-bold mb-1">Booking Details</h4>
                 <p className="text-muted mb-0">
                   Visitor information
                 </p>
               </div>
 
-              <div>
-                {renderStatusBadge(
-                  booking.status
-                )}
-              </div>
-
+              {statusBadge()}
             </div>
 
-
-            {/* -------------------------------------------
-                VISITOR DETAILS
-            -------------------------------------------- */}
-
-            <h6 className="fw-bold mb-3">
-              Visitor Details
-            </h6>
+            {/* VISITOR */}
+            <h6 className="fw-bold mb-3">Visitor Details</h6>
 
             <div className="row g-3">
-
-              {/* NAME */}
-
-              <div className="col-12 col-md-6">
-                <div className="border rounded p-3 h-100">
-
-                  <small className="text-muted d-block mb-1">
-                    Visitor Name
-                  </small>
-
-                  <div className="fw-semibold fs-5 text-break">
-                    {booking.name ||
-                      "-"}
-                  </div>
-
-                </div>
-              </div>
-
-
-              {/* MOBILE */}
-
-              <div className="col-12 col-md-6">
-                <div className="border rounded p-3 h-100">
-
-                  <small className="text-muted d-block mb-1">
-                    Mobile Number
-                  </small>
-
-                  <div className="fw-semibold text-break">
-                    {booking.mobile_no ||
-                      booking.phone ||
-                      "-"}
-                  </div>
-
-                </div>
-              </div>
-
-
-              {/* EMAIL */}
-
-              <div className="col-12 col-md-6">
-                <div className="border rounded p-3 h-100">
-
-                  <small className="text-muted d-block mb-1">
-                    Email
-                  </small>
-
-                  <div
-                    className="fw-semibold text-break"
-                    style={{
-                      overflowWrap:
-                        "anywhere",
-                    }}
-                  >
-                    {booking.email ||
-                      "-"}
-                  </div>
-
-                </div>
-              </div>
-
-
-              {/* BOOKING ID */}
-
-              <div className="col-12 col-md-6">
-                <div className="border rounded p-3 h-100">
-
-                  <small className="text-muted d-block mb-1">
-                    Booking ID
-                  </small>
-
-                  <div
-                    className="fw-semibold text-break"
-                    style={{
-                      overflowWrap:
-                        "anywhere",
-                      fontSize:
-                        "14px",
-                    }}
-                  >
-                    {booking._id ||
-                      booking.qrId ||
-                      "-"}
-                  </div>
-
-                </div>
-              </div>
-
+              {field("Visitor Name", booking.name)}
+              {field(
+                "Mobile Number",
+                booking.mobile_no || booking.phone
+              )}
+              {field("Email", booking.email)}
+              {field(
+                "Booking ID",
+                booking._id || booking.qrId
+              )}
             </div>
 
-
-            {/* -------------------------------------------
-                ABHISHEK DETAILS
-            -------------------------------------------- */}
-
+            {/* ABHISHEK */}
             <h6 className="fw-bold mt-4 mb-3">
               Abhishek Details
             </h6>
 
             <div className="row g-3">
-
-              {/* TYPE */}
-
-              <div className="col-12 col-md-6">
-                <div className="bg-light rounded p-3 h-100">
-
-                  <small className="text-muted d-block mb-1">
-                    Abhishek Type
-                  </small>
-
-                  <div className="fw-semibold">
-                    {booking.type ||
-                      "-"}
-                  </div>
-
-                </div>
-              </div>
-
-
-              {/* VISIT DATE */}
-
-              <div className="col-12 col-md-6">
-                <div className="bg-light rounded p-3 h-100">
-
-                  <small className="text-muted d-block mb-1">
-                    Visit Date
-                  </small>
-
-                  <div className="fw-semibold">
-                    {formatDate(
-                      booking.date
-                    )}
-                  </div>
-
-                </div>
-              </div>
-
-
-              {/* BATCH */}
-
-              <div className="col-12 col-md-6">
-                <div className="bg-light rounded p-3 h-100">
-
-                  <small className="text-muted d-block mb-1">
-                    Batch Time
-                  </small>
-
-                  <div className="fw-semibold">
-                    {booking.batchTime ||
-                      "-"}
-                  </div>
-
-                </div>
-              </div>
-
-
-              {/* HALL */}
-
-              <div className="col-12 col-md-6">
-                <div className="bg-light rounded p-3 h-100">
-
-                  <small className="text-muted d-block mb-1">
-                    Hall
-                  </small>
-
-                  <div className="fw-semibold">
-                    {booking.hall ||
-                      "-"}
-                  </div>
-
-                </div>
-              </div>
-
+              {field(
+                "Abhishek Type",
+                booking.type || booking.typeOfAbhishek
+              )}
+              {field("Visit Date", formatDate(booking.date))}
+              {field(
+                "Batch Time",
+                booking.batchTime || booking.batch_time
+              )}
+              {field("Hall", booking.hall)}
             </div>
 
-
-            {/* -------------------------------------------
-                RECEIPT DETAILS
-            -------------------------------------------- */}
-
+            {/* RECEIPT */}
             <h6 className="fw-bold mt-4 mb-3">
               Receipt Details
             </h6>
 
             <div className="row g-3">
+              {field(
+                "Receipt Number",
+                booking.receipt || booking.receipt_number,
+                "col-12 col-md-4"
+              )}
 
-              {/* RECEIPT */}
+              {field(
+                "Serial Number",
+                booking.serial ?? booking.serial_number,
+                "col-12 col-md-4"
+              )}
 
-              <div className="col-12 col-md-4">
-                <div className="border rounded p-3 h-100">
-
-                  <small className="text-muted d-block mb-1">
-                    Receipt Number
-                  </small>
-
-                  <div className="fw-semibold">
-                    {booking.receipt ||
-                      "-"}
-                  </div>
-
-                </div>
-              </div>
-
-
-              {/* SERIAL */}
-
-              <div className="col-12 col-md-4">
-                <div className="border rounded p-3 h-100">
-
-                  <small className="text-muted d-block mb-1">
-                    Serial Number
-                  </small>
-
-                  <div className="fw-semibold">
-                    {booking.serial ??
-                      "-"}
-                  </div>
-
-                </div>
-              </div>
-
-
-              {/* AMOUNT */}
-
-              <div className="col-12 col-md-4">
-                <div className="border rounded p-3 h-100">
-
-                  <small className="text-muted d-block mb-1">
-                    Amount
-                  </small>
-
-                  <div className="fw-bold fs-5">
-                    {formatAmount(
-                      booking.amount
-                    )}
-                  </div>
-
-                </div>
-              </div>
-
+              {field(
+                "Amount",
+                formatAmount(booking.amount),
+                "col-12 col-md-4"
+              )}
             </div>
 
-
-            {/* -------------------------------------------
-                CHECK-IN INFORMATION
-            -------------------------------------------- */}
-
+            {/* CHECK-IN INFO */}
             {(booking.checkedInAt ||
               booking.statusUpdatedBy) && (
               <>
@@ -3150,280 +2531,130 @@ function ScannerMain() {
                 </h6>
 
                 <div className="row g-3">
+                  {booking.checkedInAt &&
+                    field(
+                      "Checked In At",
+                      formatDateTime(booking.checkedInAt)
+                    )}
 
-                  {booking.checkedInAt && (
-                    <div className="col-12 col-md-6">
-
-                      <div className="bg-light rounded p-3">
-
-                        <small className="text-muted d-block mb-1">
-                          Checked In At
-                        </small>
-
-                        <div className="fw-semibold">
-                          {formatDateTime(
-                            booking.checkedInAt
-                          )}
-                        </div>
-
-                      </div>
-
-                    </div>
-                  )}
-
-                  {booking.statusUpdatedBy && (
-                    <div className="col-12 col-md-6">
-
-                      <div className="bg-light rounded p-3">
-
-                        <small className="text-muted d-block mb-1">
-                          Status Updated By
-                        </small>
-
-                        <div className="fw-semibold text-break">
-                          {
-                            booking.statusUpdatedBy
-                          }
-                        </div>
-
-                      </div>
-
-                    </div>
-                  )}
-
+                  {booking.statusUpdatedBy &&
+                    field(
+                      "Status Updated By",
+                      typeof booking.statusUpdatedBy === "object"
+                        ? booking.statusUpdatedBy.name ||
+                            booking.statusUpdatedBy.email ||
+                            booking.statusUpdatedBy._id
+                        : booking.statusUpdatedBy
+                    )}
                 </div>
               </>
             )}
 
+            {/* ACTION MESSAGE */}
+            {status === "completed" && (
+              <div className="alert alert-success mt-4 mb-0">
+                <strong>
+                  <i className="fa fa-check-circle me-2" />
+                  Already Checked In
+                </strong>
 
-            {/* -------------------------------------------
-                HIGHER AUTHORITY
-            -------------------------------------------- */}
-
-            {authorityMessage && (
-              <div className="alert alert-warning mt-4 mb-0">
-
-                <div className="d-flex align-items-start">
-
-                  <i className="fa fa-user-shield fs-4 me-3 mt-1"></i>
-
-                  <div>
-
-                    <strong>
-                      Please Refer to Higher Authority
-                    </strong>
-
-                    <div className="mt-1">
-                      {authorityMessage}
-                    </div>
-
-                  </div>
-
+                <div className="mt-1">
+                  This ticket has already been checked in.
                 </div>
-
               </div>
             )}
 
+            {status === "cancelled" && (
+              <div className="alert alert-danger mt-4 mb-0">
+                <strong>
+                  <i className="fa fa-times-circle me-2" />
+                  Booking Cancelled
+                </strong>
 
-            {/* -------------------------------------------
-                PENDING
-            -------------------------------------------- */}
+                <div className="mt-1">
+                  This booking cannot be checked in. Please
+                  refer to higher authority.
+                </div>
+              </div>
+            )}
 
-            {booking.status ===
-              "pending" &&
-              !authorityMessage && (
-                <div className="border-top mt-4 pt-4">
+            {status === "pending" && !authorityMessage && (
+              <div className="border-top mt-4 pt-4">
+                <div className="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3">
+                  <div>
+                    <h6 className="fw-bold mb-1">
+                      Ready for Check-in
+                    </h6>
 
-                  <div className="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3">
-
-                    <div>
-                      <h6 className="fw-bold mb-1">
-                        Ready for Check-in
-                      </h6>
-
-                      <small className="text-muted">
-                        Verify the visitor details
-                        before checking in.
-                      </small>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="btn btn-success btn-lg px-4"
-                      onClick={
-                        updateBooking
-                      }
-                      disabled={
-                        checkingIn
-                      }
-                    >
-                      {checkingIn ? (
-                        <>
-                          <span
-                            className="spinner-border spinner-border-sm me-2"
-                            role="status"
-                          ></span>
-
-                          Checking In...
-                        </>
-                      ) : (
-                        <>
-                          <i className="fa fa-check-circle me-2"></i>
-
-                          Update / Check In
-                        </>
-                      )}
-                    </button>
-
+                    <small className="text-muted">
+                      Verify the visitor details before
+                      checking in.
+                    </small>
                   </div>
 
+                  <button
+                    className="btn btn-success btn-lg"
+                    onClick={updateBooking}
+                    disabled={checkingIn}
+                  >
+                    {checkingIn ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" />
+                        Checking In...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fa fa-check-circle me-2" />
+                        Check In
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
+              </div>
+            )}
 
-
-            {/* -------------------------------------------
-                COMPLETED
-            -------------------------------------------- */}
-
-            {booking.status ===
-              "completed" && (
-                <div className="alert alert-success mt-4 mb-0">
-
-                  <div className="d-flex align-items-start">
-
-                    <i className="fa fa-check-circle fs-4 me-3 mt-1"></i>
-
-                    <div>
-
-                      <strong>
-                        Booking Already Checked In
-                      </strong>
-
-                      <div className="small mt-1">
-                        This ticket has already
-                        been checked in and cannot
-                        be checked in again.
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                </div>
-              )}
-
-
-            {/* -------------------------------------------
-                CANCELLED
-            -------------------------------------------- */}
-
-            {booking.status ===
-              "cancelled" && (
-                <div className="alert alert-danger mt-4 mb-0">
-
-                  <div className="d-flex align-items-start">
-
-                    <i className="fa fa-times-circle fs-4 me-3 mt-1"></i>
-
-                    <div>
-
-                      <strong>
-                        Booking Cancelled
-                      </strong>
-
-                      <div className="small mt-1">
-                        This ticket cannot be
-                        checked in. Please refer
-                        to higher authority.
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                </div>
-              )}
-
-
-            {/* -------------------------------------------
-                SCAN ANOTHER
-            -------------------------------------------- */}
-
+            {/* SCAN AGAIN */}
             <div className="border-top mt-4 pt-4">
-
               <button
-                type="button"
                 className="btn btn-outline-dark btn-lg w-100"
-                onClick={
-                  scanAgain
-                }
-                disabled={
-                  checkingIn
-                }
+                onClick={scanAgain}
+                disabled={checkingIn}
               >
-                <i className="fa fa-qrcode me-2"></i>
-
+                <i className="fa fa-qrcode me-2" />
                 Scan Another Ticket
               </button>
-
             </div>
-
           </div>
         </div>
       )}
 
-
-      {/* =================================================
-          NO BOOKING / INITIAL SCREEN
-      ================================================= */}
-
+      {/* EMPTY */}
       {!scannerOpen &&
         !loading &&
         !booking &&
         !errorMessage && (
-          <div className="card shadow-sm border-0">
-
+          <div className="card border-0 shadow-sm">
             <div className="card-body text-center py-5 px-3">
+              <div className="fs-1 mb-3">📱</div>
 
-              <div
-                className="mb-3"
-                style={{
-                  fontSize: "52px",
-                }}
-              >
-                📱
-              </div>
-
-              <h5 className="fw-bold">
-                Ready to Scan
-              </h5>
+              <h5 className="fw-bold">Ready to Scan</h5>
 
               <p className="text-muted mb-4">
-                Scan the QR code on the
-                visitor's booking receipt
-                to view details and check-in.
+                Scan the QR code on the visitor's booking
+                receipt.
               </p>
 
               <button
-                type="button"
-                className="btn btn-dark btn-lg px-4 w-100"
-                style={{
-                  maxWidth: "350px",
-                }}
-                onClick={
-                  openScanner
-                }
+                className="btn btn-dark btn-lg w-100"
+                style={{ maxWidth: "350px" }}
+                onClick={openScanner}
               >
-                <i className="fa fa-qrcode me-2"></i>
-
+                <i className="fa fa-qrcode me-2" />
                 Start Scanner
               </button>
-
             </div>
-
           </div>
         )}
-
     </div>
   );
 }
