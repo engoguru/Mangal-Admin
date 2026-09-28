@@ -2046,11 +2046,11 @@ function ScannerMain() {
         apiUrl,
         {
           method: "GET",
-         ...config,
-          headers: {
-            Accept:
-              "application/json",
-          },
+         config,
+          // headers: {
+          //   Accept:
+          //     "application/json",
+          // },
         }
       );
 
@@ -2369,14 +2369,14 @@ function ScannerMain() {
             apiUrl,
             {
               method: "PATCH",
-  ...config,
-              headers: {
-                Accept:
-                  "application/json",
+  config,
+              // headers: {
+              //   Accept:
+              //     "application/json",
 
-                "Content-Type":
-                  "application/json",
-              },
+              //   "Content-Type":
+              //     "application/json",
+              // },
             }
           );
 
