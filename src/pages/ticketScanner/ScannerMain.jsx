@@ -2082,12 +2082,12 @@ function ScannerMain() {
         ) {
           setAuthorityMessage(
             result.message ||
-              "Please refer to higher authority."
+            "Please refer to higher authority."
           );
         } else {
           setErrorMessage(
             result?.message ||
-              "Unable to find this booking."
+            "Unable to find this booking."
           );
         }
 
@@ -2133,7 +2133,7 @@ function ScannerMain() {
 
       setErrorMessage(
         error?.message ||
-          "Unable to load booking details."
+        "Unable to load booking details."
       );
     } finally {
       setLoading(false);
@@ -2368,7 +2368,7 @@ function ScannerMain() {
             apiUrl,
             {
               method: "PATCH",
-
+              credentials: "include",
               headers: {
                 Accept:
                   "application/json",
@@ -2408,12 +2408,12 @@ function ScannerMain() {
           ) {
             setAuthorityMessage(
               result.message ||
-                "Please refer to higher authority."
+              "Please refer to higher authority."
             );
           } else {
             setErrorMessage(
               result?.message ||
-                "Unable to update booking."
+              "Unable to update booking."
             );
           }
 
@@ -2461,7 +2461,7 @@ function ScannerMain() {
 
         setErrorMessage(
           error?.message ||
-            "Unable to update booking."
+          "Unable to update booking."
         );
       } finally {
         setCheckingIn(false);
@@ -3143,56 +3143,56 @@ function ScannerMain() {
 
             {(booking.checkedInAt ||
               booking.statusUpdatedBy) && (
-              <>
-                <h6 className="fw-bold mt-4 mb-3">
-                  Check-in Information
-                </h6>
+                <>
+                  <h6 className="fw-bold mt-4 mb-3">
+                    Check-in Information
+                  </h6>
 
-                <div className="row g-3">
+                  <div className="row g-3">
 
-                  {booking.checkedInAt && (
-                    <div className="col-12 col-md-6">
+                    {booking.checkedInAt && (
+                      <div className="col-12 col-md-6">
 
-                      <div className="bg-light rounded p-3">
+                        <div className="bg-light rounded p-3">
 
-                        <small className="text-muted d-block mb-1">
-                          Checked In At
-                        </small>
+                          <small className="text-muted d-block mb-1">
+                            Checked In At
+                          </small>
 
-                        <div className="fw-semibold">
-                          {formatDateTime(
-                            booking.checkedInAt
-                          )}
+                          <div className="fw-semibold">
+                            {formatDateTime(
+                              booking.checkedInAt
+                            )}
+                          </div>
+
                         </div>
 
                       </div>
+                    )}
 
-                    </div>
-                  )}
+                    {booking.statusUpdatedBy && (
+                      <div className="col-12 col-md-6">
 
-                  {booking.statusUpdatedBy && (
-                    <div className="col-12 col-md-6">
+                        <div className="bg-light rounded p-3">
 
-                      <div className="bg-light rounded p-3">
+                          <small className="text-muted d-block mb-1">
+                            Status Updated By
+                          </small>
 
-                        <small className="text-muted d-block mb-1">
-                          Status Updated By
-                        </small>
+                          <div className="fw-semibold text-break">
+                            {
+                              booking.statusUpdatedBy
+                            }
+                          </div>
 
-                        <div className="fw-semibold text-break">
-                          {
-                            booking.statusUpdatedBy
-                          }
                         </div>
 
                       </div>
+                    )}
 
-                    </div>
-                  )}
-
-                </div>
-              </>
-            )}
+                  </div>
+                </>
+              )}
 
 
             {/* -------------------------------------------
