@@ -2046,7 +2046,7 @@ function ScannerMain() {
         apiUrl,
         {
           method: "GET",
-         ...config,
+     headers: config.headers,
           // headers: {
           //   Accept:
           //     "application/json",
@@ -2369,7 +2369,7 @@ function ScannerMain() {
             apiUrl,
             {
               method: "PATCH",
-  ...config,
+ headers: config.headers,
               // headers: {
               //   Accept:
               //     "application/json",
