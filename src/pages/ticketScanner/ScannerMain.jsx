@@ -2045,6 +2045,7 @@ function ScannerMain() {
         apiUrl,
         {
           method: "GET",
+          credentials: "include",
           headers: {
             Accept:
               "application/json",
