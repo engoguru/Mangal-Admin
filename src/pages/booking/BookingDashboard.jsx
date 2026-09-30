@@ -957,70 +957,70 @@ const BookingDashboard = () => {
         }
     };
 
-//     const downloadBookingPDF = async (id) => {
-//         try {
-//             console.log("hit")
-//             const response = await axios.get(
-//                 `${base_booking_url2}booking/${id}/download`,
-//                 {
-//                     responseType: "blob",
-//                     headers: {
-//                         Authorization: `Bearer ${token}`,
-//                     },
-//                 }
-//             );
-// console.log("response",response)
-//             const url = window.URL.createObjectURL(new Blob([response.data]));
-//             const link = document.createElement("a");
-//             link.href = url;
-//             link.setAttribute("download", `${id}_Booking.pdf`);
-//             document.body.appendChild(link);
-//             link.click();
-//             link.remove();
-//         } catch (err) {
-//             setError(err.response?.data?.message || "Failed to download booking!");
-//         }
-//     };
+    //     const downloadBookingPDF = async (id) => {
+    //         try {
+    //             console.log("hit")
+    //             const response = await axios.get(
+    //                 `${base_booking_url2}booking/${id}/download`,
+    //                 {
+    //                     responseType: "blob",
+    //                     headers: {
+    //                         Authorization: `Bearer ${token}`,
+    //                     },
+    //                 }
+    //             );
+    // console.log("response",response)
+    //             const url = window.URL.createObjectURL(new Blob([response.data]));
+    //             const link = document.createElement("a");
+    //             link.href = url;
+    //             link.setAttribute("download", `${id}_Booking.pdf`);
+    //             document.body.appendChild(link);
+    //             link.click();
+    //             link.remove();
+    //         } catch (err) {
+    //             setError(err.response?.data?.message || "Failed to download booking!");
+    //         }
+    //     };
 
 
 
-const downloadBookingPDF = async (id) => {
-    try {
-        console.log("🔥 Download clicked:", id);
+    const downloadBookingPDF = async (id) => {
+        try {
+            console.log("🔥 Download clicked:", id);
 
-        const response = await axios.get(
-            `${base_booking_url2}booking/${id}/download`,
-            {
-                ...config,
-                responseType: "blob",
-            }
-        );
+            const response = await axios.get(
+                `${base_booking_url2}booking/${id}/download`,
+                {
+                    ...config,
+                    responseType: "blob",
+                }
+            );
 
-        console.log("🔥 Response:", response);
+            console.log("🔥 Response:", response);
 
-        const blob = new Blob([response.data], {
-            type: "application/pdf",
-        });
+            const blob = new Blob([response.data], {
+                type: "application/pdf",
+            });
 
-        const url = window.URL.createObjectURL(blob);
+            const url = window.URL.createObjectURL(blob);
 
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${id}_Booking.pdf`;
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${id}_Booking.pdf`;
 
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
 
-        window.URL.revokeObjectURL(url);
-    } catch (err) {
-        console.error("❌ Download error:", err);
-        setError(
-            err.response?.data?.message ||
-            "Failed to download booking!"
-        );
-    }
-};
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("❌ Download error:", err);
+            setError(
+                err.response?.data?.message ||
+                "Failed to download booking!"
+            );
+        }
+    };
 
     const downloadExcel = () => {
         const data = bookings?.map((booking) => ({
@@ -1097,6 +1097,7 @@ const downloadBookingPDF = async (id) => {
                 };
             }
         } catch (err) {
+            console.log(err)
             setError(err.response?.data?.message || "Failed to create booking!");
         } finally {
             setLoading(false);
@@ -1147,7 +1148,6 @@ const downloadBookingPDF = async (id) => {
         bookings.length > rowsPerPage
             ? bookings.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
             : bookings;
-
     const isSubadmin = getTokenFromLocalStorage?.admin?.role === "subadmin";
 
     return (

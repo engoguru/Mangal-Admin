@@ -10,10 +10,18 @@ const getTokenFromLocalStorage = () => {
   }
 };
 
+// NOTE: `headers` is a getter on purpose.
+// Previously the token was read ONCE when this module was first imported
+// (i.e. before login), so every request sent right after login carried an
+// empty "Bearer " header and data only loaded after a manual page refresh.
+// A getter re-reads localStorage every time axios (or `...config`) reads it,
+// so the fresh token is used immediately after login.
 export const config = {
-  headers: {
-    Authorization: `Bearer ${getTokenFromLocalStorage()}`,
-    Accept: "application/json",
+  get headers() {
+    return {
+      Authorization: `Bearer ${getTokenFromLocalStorage()}`,
+      Accept: "application/json",
+    };
   },
   withCredentials: true,
 };

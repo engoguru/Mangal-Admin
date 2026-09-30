@@ -1,6 +1,5 @@
 
 import { Toaster } from 'react-hot-toast'
-import './App.css'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 // import { OpenRoute } from './routing/OpenRoutes'
 import Login from './pages/Login'
