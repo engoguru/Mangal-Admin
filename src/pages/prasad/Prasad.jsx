@@ -19,7 +19,7 @@ import {
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import moment from "moment";
-import { base_booking_url } from "../../utils/base_url";
+import { base_booking_url2 } from "../../utils/base_url";
 import * as XLSX from "xlsx";
 import { MdDelete } from "react-icons/md";
 import { FaCloudDownloadAlt } from "react-icons/fa";
@@ -94,7 +94,7 @@ const Prasad = () => {
     
     const handleGenerateReport = async () => {
         try {
-            const response = await axios.get(`${base_booking_url}/prasad/download-receipt-pdf`, {
+            const response = await axios.get(`${base_booking_url2}/prasad/download-receipt-pdf`, {
                 params: filters,
                 responseType: 'blob',
                 ...config
@@ -120,7 +120,7 @@ const Prasad = () => {
     useEffect(() => {
         const fetchBookings = async () => {
             try {
-                const response = await axios.get(`${base_booking_url}/prasad/`, config);
+                const response = await axios.get(`${base_booking_url2}/prasad/`, config);
                 setBookings(response.data.bookings);
                 setTotalBookings(response.data.totalBookings);
             } catch (err) {
@@ -132,7 +132,7 @@ const Prasad = () => {
 
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`${base_booking_url}/prasad/${id}`, config);
+            await axios.delete(`${base_booking_url2}/prasad/${id}`, config);
             setBookings(bookings.filter((booking) => booking._id !== id));
             setTotalBookings(totalBookings - 1);
             window.location.reload();  // This will reload the page
@@ -143,7 +143,7 @@ const Prasad = () => {
 
     const downloadBookingPDF = async (id) => {
         try {
-            const response = await axios.get(`${base_booking_url}/prasad/${id}/download`, {
+            const response = await axios.get(`${base_booking_url2}/prasad/${id}/download`, {
                 responseType: "blob",
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -176,7 +176,7 @@ const Prasad = () => {
     const handleCreateBooking = async () => {
         try {
           // Step 1: Create the booking
-          const response = await axios.post(`${base_booking_url}/prasad/create`, newBooking, config);
+          const response = await axios.post(`${base_booking_url2}/prasad/create`, newBooking, config);
           const createdBooking = response.data.booking;
       
           // Update booking state
@@ -197,7 +197,7 @@ const Prasad = () => {
           setError("");
       
           // Step 2: Fetch the PDF
-          const pdfResponse = await axios.get(`${base_booking_url}/prasad/${createdBooking._id}/download`, {
+          const pdfResponse = await axios.get(`${base_booking_url2}/prasad/${createdBooking._id}/download`, {
             responseType: "blob",
           });
       
@@ -248,7 +248,7 @@ const Prasad = () => {
 
         try {
             setError("");
-            const response = await axios.get(`${base_booking_url}/prasad`, { params, ...config });
+            const response = await axios.get(`${base_booking_url2}/prasad`, { params, ...config });
             setBookings(response.data.bookings || []);
             setTotalBookings(response.data.totalBookings || 0);
         } catch (err) {

@@ -1,24 +1,24 @@
 import axios from 'axios';
-import { base_url } from '../../utils/base_url';
+import { base_booking_url2 } from '../../utils/base_url';
 import { config } from '../../utils/axiosconfig';
 
 const getAllNitya = async () => {
-  const response = await axios.get(`${base_url}/nitya/all`, config);
+  const response = await axios.get(`${base_booking_url2}/nitya/all`, config);
   return response.data;
 };
   
 const searchNitya = async (query) => {
-  const response = await axios.get(`${base_url}/nitya/search`, { params: query });
+  const response = await axios.get(`${base_booking_url2}/nitya/search`, { params: query });
   return response.data;
 };
 
 const deleteNitya = async (id) => {
-  const response = await axios.delete(`${base_url}/nitya/delete/${id}`,config);
+  const response = await axios.delete(`${base_booking_url2}/nitya/delete/${id}`,config);
   return response.data;
 };
 
 const getSingleNitya = async (id) => {
-  const response = await axios.get(`${base_url}/nitya/single/${id}`, config);
+  const response = await axios.get(`${base_booking_url2}/nitya/single/${id}`, config);
   return response.data;
 };
   

@@ -8,7 +8,7 @@ import { deleteHawanatmakThunk, getAllHawanatmaks, searchHawanatmakThunk } from 
 import { formatDate } from "../../utils";
 import { IoIosMail } from "react-icons/io";
 import axios from "axios";
-import { base_url } from "../../utils/base_url";
+import { base_booking_url2} from "../../utils/base_url";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import { BarChart, Bar, PieChart, Pie, Cell, Tooltip, ResponsiveContainer, XAxis, YAxis } from "recharts";

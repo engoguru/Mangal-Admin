@@ -1,6 +1,6 @@
 // export const base_url = "http://localhost:8348/api/v1";
-export const base_url = "https://backend.mangalagrahmandir.in/api/v1";
-export const base_booking_url = "https://api.mangalagrahmandir.in/api/v1";
+// export const base_url = "https://backend.mangalagrahmandir.in/api/v1";
+// export const base_booking_url = "https://api.mangalagrahmandir.in/api/v1";
 
 
 

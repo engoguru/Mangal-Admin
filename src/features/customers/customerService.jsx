@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { base_booking_url2, base_url } from '../../utils/base_url';
+import { base_booking_url2 } from '../../utils/base_url';
 import { config } from '../../utils/axiosconfig';
 
 
@@ -10,7 +10,7 @@ const getUsers = async () => {
 };
 
 const deleteUser = async (id) => {
-    const response = await axios.delete(`${base_url}/users/delete/${id}`, config);
+    const response = await axios.delete(`${base_booking_url2}/users/delete/${id}`, config);
     return response.data;
   };
 
