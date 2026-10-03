@@ -33,7 +33,7 @@ import {
 } from "@mui/material";
 import axios from "axios";
 import moment from "moment";
-import {  base_booking_url2 } from "../../utils/base_url";
+import { base_booking_url2 } from "../../utils/base_url";
 import * as XLSX from "xlsx";
 import { MdDelete } from "react-icons/md";
 import { FaCloudDownloadAlt } from "react-icons/fa";
@@ -277,7 +277,8 @@ const BookingDashboard = () => {
         setLoading(true);
         try {
             const response = await axios.post(`${base_booking_url2}booking/create`, newBooking, config);
-            const createdBooking = response.data.booking;
+            // console.log(response,"ghrugerguigugeuhierfruifghjbdf bhjlhdf")
+            const createdBooking = response.data.bookingModel;
 
             setBookings([response.data.booking, ...bookings]);
             setTotalBookings(totalBookings + 1);
@@ -296,8 +297,9 @@ const BookingDashboard = () => {
             setCustomType(false);
             setError("");
 
-            const pdfResponse = await axios.get(`${base_booking_url2}/booking/${createdBooking._id}/download`, {
+            const pdfResponse = await axios.get(`${base_booking_url2}booking/${createdBooking._id}/download`, {
                 responseType: "blob",
+                ...config
             });
 
             const blob = new Blob([pdfResponse.data], { type: "application/pdf" });
