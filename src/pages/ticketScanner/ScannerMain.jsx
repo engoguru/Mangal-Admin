@@ -2664,6 +2664,829 @@
 
 
 
+// import React, { useEffect, useRef, useState } from "react";
+// import { Html5Qrcode } from "html5-qrcode";
+// import axios from "axios";
+
+// import { base_booking_url2 } from "../../utils/base_url";
+// import { config } from "../../utils/axiosconfig";
+
+// /* ---------------- helpers ---------------- */
+
+// // Backend may wrap the booking differently: {data}, {data:{booking}}, {data:{data}} ...
+// const extractBooking = (payload) => {
+//   if (!payload) return null;
+//   const d = payload.data ?? payload;
+//   return d?.booking || d?.ticket || d?.data || d;
+// };
+
+// // Email can live in different places depending on the API
+// const pickEmail = (b) =>
+//   b?.email ||
+//   b?.user_email ||
+//   b?.userEmail ||
+//   b?.user?.email ||
+//   b?.customer?.email ||
+//   b?.visitor?.email ||
+//   "";
+
+// const pickMobile = (b) =>
+//   b?.mobile_no ||
+//   b?.mobile ||
+//   b?.phone ||
+//   b?.user?.mobile_no ||
+//   b?.user?.phone ||
+//   "";
+
+// const pickName = (b) => b?.name || b?.user?.name || b?.visitor_name || "";
+
+// const getVisitDate = (b) => b?.date || b?.visitDate || b?.visit_date || null;
+
+// // "YYYY-MM-DD" in Indian time, so UTC-stored dates don't shift the day
+// const toIstDay = (date) => {
+//   const d = new Date(date);
+//   if (Number.isNaN(d.getTime())) return null;
+//   return d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+// };
+
+// const isVisitToday = (b) => {
+//   const visit = getVisitDate(b);
+//   if (!visit) return false;
+//   return toIstDay(visit) === toIstDay(new Date());
+// };
+
+// const getStatus = (b) =>
+//   String(b?.status || b?.bookingStatus || "").trim().toLowerCase();
+
+// const NOT_TODAY_MESSAGE =
+//   "Visit date is not today. Please ask higher authority before updating this booking.";
+
+// /* ---------------- component ---------------- */
+
+// function ScannerMain() {
+//   const [scannerOpen, setScannerOpen] = useState(false);
+//   const [booking, setBooking] = useState(null);
+//   const [rawResponse, setRawResponse] = useState(null);
+//   const [loading, setLoading] = useState(false);
+//   const [checkingIn, setCheckingIn] = useState(false);
+//   const [errorMessage, setErrorMessage] = useState("");
+//   const [authorityMessage, setAuthorityMessage] = useState("");
+//   const [showAuthorityModal, setShowAuthorityModal] = useState(false);
+
+//   const scannerRef = useRef(null);
+//   const scannedRef = useRef(false);
+
+//   const getApiUrl = (type, id) => {
+//     const baseUrl = base_booking_url2.replace(/\/$/, "");
+//     return `${baseUrl}/qr/verify/${encodeURIComponent(type)}/${encodeURIComponent(id)}`;
+//   };
+
+//   const getVerifyDetails = (qrUrl) => {
+//     try {
+//       const url = new URL(qrUrl);
+//       const parts = url.pathname.split("/").filter(Boolean);
+//       const index = parts.indexOf("verify");
+
+//       if (index === -1 || !parts[index + 1] || !parts[index + 2]) {
+//         return null;
+//       }
+
+//       return { type: parts[index + 1], id: parts[index + 2] };
+//     } catch {
+//       return null;
+//     }
+//   };
+
+//   const resetMessages = () => {
+//     setErrorMessage("");
+//     setAuthorityMessage("");
+//     setShowAuthorityModal(false);
+//   };
+
+//   const openScanner = () => {
+//     setBooking(null);
+//     setRawResponse(null);
+//     resetMessages();
+//     setLoading(false);
+//     setCheckingIn(false);
+//     scannedRef.current = false;
+//     setScannerOpen(true);
+//   };
+
+//   // Single place that stores booking + decides whether the authority popup is needed
+//   const applyBooking = (payload, type, id, apiUrl, merge = false) => {
+//     const data = extractBooking(payload);
+//     if (!data || typeof data !== "object") return null;
+
+//     const next = { ...data, qrType: type, qrId: id, verifyUrl: apiUrl };
+
+//     setBooking((prev) => (merge && prev ? { ...prev, ...next } : next));
+
+//     // Pending but not for today -> ask higher authority (popup)
+//     if (getStatus(next) === "pending" && !isVisitToday(next)) {
+//       setAuthorityMessage(NOT_TODAY_MESSAGE);
+//       setShowAuthorityModal(true);
+//     }
+
+//     return next;
+//   };
+
+//   const loadBooking = async (qrUrl) => {
+//     if (!qrUrl) {
+//       setErrorMessage("No QR code was scanned.");
+//       return;
+//     }
+
+//     const qrDetails = getVerifyDetails(qrUrl);
+
+//     if (!qrDetails) {
+//       setErrorMessage("Invalid QR code. Please scan a valid booking QR.");
+//       return;
+//     }
+
+//     const { type, id } = qrDetails;
+//     const apiUrl = getApiUrl(type, id);
+
+//     setLoading(true);
+//     setBooking(null);
+//     setRawResponse(null);
+//     resetMessages();
+
+//     try {
+//       const response = await axios.get(apiUrl, config);
+//       const result = response.data;
+
+//       console.log("VERIFY RESPONSE:", result);
+//       setRawResponse(result);
+
+//       if (result?.success === false) {
+//         if (result.requiresAuthority) {
+//           setAuthorityMessage(
+//             result.message || "Please refer to higher authority."
+//           );
+//           setShowAuthorityModal(true);
+//         } else {
+//           setErrorMessage(result.message || "Unable to find this booking.");
+//         }
+
+//         applyBooking(result, type, id, apiUrl);
+//         return;
+//       }
+
+//       const applied = applyBooking(result, type, id, apiUrl);
+
+//       if (!applied) {
+//         throw new Error("Booking data not found.");
+//       }
+
+//       // Backend explicitly asks for authority
+//       if (result?.requiresAuthority) {
+//         setAuthorityMessage(
+//           result.message || "Please refer to higher authority."
+//         );
+//         setShowAuthorityModal(true);
+//       }
+//     } catch (error) {
+//       console.error("LOAD BOOKING ERROR:", error);
+
+//       const data = error?.response?.data;
+//       setRawResponse(data || { error: error?.message });
+
+//       if (data) applyBooking(data, type, id, apiUrl);
+
+//       if (data?.requiresAuthority) {
+//         setAuthorityMessage(
+//           data.message || "Please refer to higher authority."
+//         );
+//         setShowAuthorityModal(true);
+//       } else {
+//         setErrorMessage(
+//           data?.message || error?.message || "Unable to load booking details."
+//         );
+//       }
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const handleQrScan = async (decodedText) => {
+//     if (scannedRef.current) return;
+
+//     scannedRef.current = true;
+
+//     try {
+//       if (scannerRef.current) {
+//         await scannerRef.current.stop();
+//       }
+//     } catch (error) {
+//       console.log("Scanner stop:", error);
+//     }
+
+//     scannerRef.current = null;
+//     setScannerOpen(false);
+
+//     await loadBooking(decodedText);
+//   };
+
+//   useEffect(() => {
+//     if (!scannerOpen) return;
+
+//     let mounted = true;
+
+//     const scanner = new Html5Qrcode("qr-reader");
+//     scannerRef.current = scanner;
+//     scannedRef.current = false;
+
+//     const start = async () => {
+//       try {
+//         await scanner.start(
+//           { facingMode: "environment" },
+//           { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 },
+//           async (decodedText) => {
+//             if (mounted) {
+//               await handleQrScan(decodedText);
+//             }
+//           },
+//           () => {}
+//         );
+//       } catch (error) {
+//         console.error("CAMERA ERROR:", error);
+
+//         if (mounted) {
+//           setScannerOpen(false);
+//           setErrorMessage(
+//             "Unable to open camera. Please allow camera permission and try again."
+//           );
+//         }
+
+//         scannerRef.current = null;
+//       }
+//     };
+
+//     start();
+
+//     return () => {
+//       mounted = false;
+
+//       const stopScanner = async () => {
+//         try {
+//           if (scannerRef.current) {
+//             await scannerRef.current.stop();
+//           }
+//         } catch (error) {
+//           console.log("Scanner cleanup:", error);
+//         }
+
+//         scannerRef.current = null;
+//       };
+
+//       stopScanner();
+//     };
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
+//   }, [scannerOpen]);
+
+//   // force = true when higher authority confirmed from the popup
+//   const updateBooking = async (force = false) => {
+//     if (!booking || checkingIn) return;
+
+//     const { qrType: type, qrId: id } = booking;
+
+//     if (!type || !id) {
+//       setErrorMessage("Booking information is incomplete.");
+//       return;
+//     }
+
+//     const current = getStatus(booking);
+
+//     if (current === "completed") return;
+
+//     if (current === "cancelled") {
+//       setAuthorityMessage(
+//         "This booking is cancelled. Please refer to higher authority."
+//       );
+//       setShowAuthorityModal(true);
+//       return;
+//     }
+
+//     if (current !== "pending") {
+//       setAuthorityMessage(
+//         "This booking cannot be checked in. Please refer to higher authority."
+//       );
+//       setShowAuthorityModal(true);
+//       return;
+//     }
+
+//     // Visit date is not today -> popup first, update only after authority confirms
+//     if (!force && !isVisitToday(booking)) {
+//       setAuthorityMessage(NOT_TODAY_MESSAGE);
+//       setShowAuthorityModal(true);
+//       return;
+//     }
+
+//     setCheckingIn(true);
+//     setErrorMessage("");
+//     setShowAuthorityModal(false);
+
+//     try {
+//       const apiUrl = getApiUrl(type, id);
+
+//       const response = await axios.patch(apiUrl, {}, config);
+//       const result = response.data;
+
+//       console.log("CHECK-IN RESPONSE:", result);
+//       setRawResponse(result);
+
+//       if (result?.success === false) {
+//         if (result.requiresAuthority) {
+//           setAuthorityMessage(
+//             result.message || "Please refer to higher authority."
+//           );
+//           setShowAuthorityModal(true);
+//         } else {
+//           setErrorMessage(result.message || "Unable to update booking.");
+//         }
+
+//         applyBooking(result, type, id, apiUrl, true);
+//         return;
+//       }
+
+//       setAuthorityMessage("");
+
+//       const data = extractBooking(result);
+
+//       if (data && typeof data === "object") {
+//         setBooking((prev) => ({
+//           ...prev,
+//           ...data,
+//           qrType: type,
+//           qrId: id,
+//           verifyUrl: apiUrl,
+//         }));
+//       } else {
+//         // API returned no booking body, but success -> reflect completed locally
+//         setBooking((prev) => ({ ...prev, status: "completed" }));
+//       }
+//     } catch (error) {
+//       console.error("CHECK-IN ERROR:", error);
+
+//       const data = error?.response?.data;
+//       setRawResponse(data || { error: error?.message });
+
+//       if (data) {
+//         const extracted = extractBooking(data);
+//         if (extracted && typeof extracted === "object") {
+//           setBooking((prev) => ({ ...prev, ...extracted, qrType: type, qrId: id }));
+//         }
+//       }
+
+//       if (data?.requiresAuthority) {
+//         setAuthorityMessage(
+//           data.message || "Please refer to higher authority."
+//         );
+//         setShowAuthorityModal(true);
+//       } else {
+//         setErrorMessage(
+//           data?.message || error?.message || "Unable to update booking."
+//         );
+//       }
+//     } finally {
+//       setCheckingIn(false);
+//     }
+//   };
+
+//   const closeScanner = async () => {
+//     try {
+//       if (scannerRef.current) {
+//         await scannerRef.current.stop();
+//       }
+//     } catch (error) {
+//       console.log("Scanner close:", error);
+//     }
+
+//     scannerRef.current = null;
+//     scannedRef.current = false;
+//     setScannerOpen(false);
+//   };
+
+//   const scanAgain = () => {
+//     setBooking(null);
+//     setRawResponse(null);
+//     resetMessages();
+//     setLoading(false);
+//     setCheckingIn(false);
+//     scannedRef.current = false;
+//     setScannerOpen(true);
+//   };
+
+//   const formatDate = (date) => {
+//     if (!date) return "-";
+//     const value = new Date(date);
+//     if (Number.isNaN(value.getTime())) return "-";
+
+//     return value.toLocaleDateString("en-IN", {
+//       day: "2-digit",
+//       month: "short",
+//       year: "numeric",
+//       timeZone: "Asia/Kolkata",
+//     });
+//   };
+
+//   const formatDateTime = (date) => {
+//     if (!date) return "-";
+//     const value = new Date(date);
+//     if (Number.isNaN(value.getTime())) return "-";
+
+//     return value.toLocaleString("en-IN", {
+//       day: "2-digit",
+//       month: "short",
+//       year: "numeric",
+//       hour: "2-digit",
+//       minute: "2-digit",
+//       timeZone: "Asia/Kolkata",
+//     });
+//   };
+
+//   const formatAmount = (amount) => {
+//     if (amount === null || amount === undefined || amount === "") return "-";
+//     const value = Number(amount);
+//     if (Number.isNaN(value)) return amount;
+//     return `₹${value.toLocaleString("en-IN")}`;
+//   };
+
+//   const status = getStatus(booking);
+//   const visitToday = booking ? isVisitToday(booking) : false;
+
+//   const statusBadge = () => {
+//     if (status === "pending") {
+//       return <span className="badge bg-warning text-dark px-3 py-2">Pending</span>;
+//     }
+//     if (status === "completed") {
+//       return <span className="badge bg-success px-3 py-2">Completed</span>;
+//     }
+//     if (status === "cancelled") {
+//       return <span className="badge bg-danger px-3 py-2">Cancelled</span>;
+//     }
+//     return (
+//       <span className="badge bg-secondary px-3 py-2">
+//         {booking?.status || "Unknown"}
+//       </span>
+//     );
+//   };
+
+//   const field = (label, value, className = "col-12 col-md-6") => (
+//     <div className={className}>
+//       <div className="border rounded p-3 h-100">
+//         <small className="text-muted d-block mb-1">{label}</small>
+//         <div className="fw-semibold text-break">{value || "-"}</div>
+//       </div>
+//     </div>
+//   );
+
+//   return (
+//     <div className="container-fluid py-3 py-md-4">
+//       {/* HEADER */}
+//       <div className="card border-0 shadow-sm mb-3">
+//         <div className="card-body p-3 p-md-4">
+//           <div className="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3">
+//             <div>
+//               <span className="badge bg-warning text-dark mb-2">Gate Check-in</span>
+//               <h3 className="fw-bold mb-1">Ticket Scanner</h3>
+//               <p className="text-muted mb-0">
+//                 Scan a visitor QR code to verify the booking.
+//               </p>
+//             </div>
+
+//             {!scannerOpen && (
+//               <button
+//                 className="btn btn-dark btn-lg"
+//                 onClick={openScanner}
+//                 disabled={loading || checkingIn}
+//               >
+//                 <i className="fa fa-qrcode me-2" />
+//                 Scan Ticket
+//               </button>
+//             )}
+//           </div>
+//         </div>
+//       </div>
+
+//       {/* ERROR */}
+//       {errorMessage && (
+//         <div className="alert alert-danger d-flex align-items-start gap-2">
+//           <i className="fa fa-exclamation-circle fs-5 mt-1" />
+//           <div className="flex-grow-1">
+//             <strong>Unable to process</strong>
+//             <div className="mt-1">{errorMessage}</div>
+//           </div>
+//           <button className="btn-close" onClick={() => setErrorMessage("")} />
+//         </div>
+//       )}
+
+//       {/* AUTHORITY (inline banner) */}
+//       {authorityMessage && !showAuthorityModal && (
+//         <div className="alert alert-warning d-flex align-items-start gap-2">
+//           <i className="fa fa-user-shield fs-5 mt-1" />
+//           <div className="flex-grow-1">
+//             <strong>Please Refer to Higher Authority</strong>
+//             <div className="mt-1">{authorityMessage}</div>
+//           </div>
+//           <button className="btn-close" onClick={() => setAuthorityMessage("")} />
+//         </div>
+//       )}
+
+//       {/* SCANNER */}
+//       {scannerOpen && (
+//         <div className="card border-0 shadow-sm mb-3">
+//           <div className="card-body p-3 p-md-4">
+//             <div className="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-3">
+//               <div>
+//                 <h5 className="fw-semibold mb-1">Scan QR Code</h5>
+//                 <small className="text-muted">
+//                   Keep the QR code inside the scanning box.
+//                 </small>
+//               </div>
+
+//               <button className="btn btn-outline-danger" onClick={closeScanner}>
+//                 Close
+//               </button>
+//             </div>
+
+//             <div
+//               id="qr-reader"
+//               style={{ width: "100%", maxWidth: "420px", margin: "0 auto" }}
+//             />
+//           </div>
+//         </div>
+//       )}
+
+//       {/* LOADING */}
+//       {loading && (
+//         <div className="card border-0 shadow-sm mb-3">
+//           <div className="card-body text-center py-5">
+//             <div className="spinner-border text-primary mb-3" />
+//             <h5 className="fw-semibold mb-1">Verifying Booking</h5>
+//             <p className="text-muted mb-0">Please wait...</p>
+//           </div>
+//         </div>
+//       )}
+
+//       {/* BOOKING */}
+//       {booking && !loading && (
+//         <div className="card border-0 shadow-sm">
+//           <div className="card-body p-3 p-md-4">
+//             {/* TITLE */}
+//             <div className="d-flex flex-column flex-sm-row justify-content-between align-items-start gap-2 border-bottom pb-3 mb-4">
+//               <div>
+//                 <h4 className="fw-bold mb-1">Booking Details</h4>
+//                 <p className="text-muted mb-0">Visitor information</p>
+//               </div>
+//               {statusBadge()}
+//             </div>
+
+//             {/* VISITOR */}
+//             <h6 className="fw-bold mb-3">Visitor Details</h6>
+
+//             <div className="row g-3">
+//               {field("Visitor Name", pickName(booking))}
+//               {field("Mobile Number", pickMobile(booking))}
+//               {field("Email", pickEmail(booking))}
+//               {field("Booking ID", booking._id || booking.qrId)}
+//             </div>
+
+//             {/* ABHISHEK */}
+//             <h6 className="fw-bold mt-4 mb-3">Abhishek Details</h6>
+
+//             <div className="row g-3">
+//               {field("Abhishek Type", booking.type || booking.typeOfAbhishek)}
+//               {field(
+//                 "Visit Date",
+//                 <>
+//                   {formatDate(getVisitDate(booking))}
+//                   {status === "pending" && (
+//                     <span
+//                       className={`badge ms-2 ${
+//                         visitToday ? "bg-success" : "bg-danger"
+//                       }`}
+//                     >
+//                       {visitToday ? "Today" : "Not today"}
+//                     </span>
+//                   )}
+//                 </>
+//               )}
+//               {field("Batch Time", booking.batchTime || booking.batch_time)}
+//               {field("Hall", booking.hall)}
+//             </div>
+
+//             {/* RECEIPT */}
+//             <h6 className="fw-bold mt-4 mb-3">Receipt Details</h6>
+
+//             <div className="row g-3">
+//               {field(
+//                 "Receipt Number",
+//                 booking.receipt || booking.receipt_number,
+//                 "col-12 col-md-4"
+//               )}
+//               {field(
+//                 "Serial Number",
+//                 booking.serial ?? booking.serial_number,
+//                 "col-12 col-md-4"
+//               )}
+//               {field("Amount", formatAmount(booking.amount), "col-12 col-md-4")}
+//             </div>
+
+//             {/* CHECK-IN INFO */}
+//             {(booking.checkedInAt || booking.statusUpdatedBy) && (
+//               <>
+//                 <h6 className="fw-bold mt-4 mb-3">Check-in Information</h6>
+
+//                 <div className="row g-3">
+//                   {booking.checkedInAt &&
+//                     field("Checked In At", formatDateTime(booking.checkedInAt))}
+
+//                   {booking.statusUpdatedBy &&
+//                     field(
+//                       "Status Updated By",
+//                       typeof booking.statusUpdatedBy === "object"
+//                         ? booking.statusUpdatedBy.name ||
+//                             booking.statusUpdatedBy.email ||
+//                             booking.statusUpdatedBy._id
+//                         : booking.statusUpdatedBy
+//                     )}
+//                 </div>
+//               </>
+//             )}
+
+//             {/* STATUS MESSAGES */}
+//             {status === "completed" && (
+//               <div className="alert alert-success mt-4 mb-0">
+//                 <strong>
+//                   <i className="fa fa-check-circle me-2" />
+//                   Already Checked In
+//                 </strong>
+//                 <div className="mt-1">This ticket has already been checked in.</div>
+//               </div>
+//             )}
+
+//             {status === "cancelled" && (
+//               <div className="alert alert-danger mt-4 mb-0">
+//                 <strong>
+//                   <i className="fa fa-times-circle me-2" />
+//                   Booking Cancelled
+//                 </strong>
+//                 <div className="mt-1">
+//                   This booking cannot be checked in. Please refer to higher
+//                   authority.
+//                 </div>
+//               </div>
+//             )}
+
+//             {/* UPDATE BUTTON: always visible for pending bookings */}
+//             {status === "pending" && (
+//               <div className="border-top mt-4 pt-4">
+//                 <div className="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3">
+//                   <div>
+//                     <h6 className="fw-bold mb-1">
+//                       {visitToday ? "Ready for Check-in" : "Visit date is not today"}
+//                     </h6>
+//                     <small className="text-muted">
+//                       {visitToday
+//                         ? "Verify the visitor details before checking in."
+//                         : "Higher authority approval is required before updating."}
+//                     </small>
+//                   </div>
+
+//                   <button
+//                     className={`btn btn-lg ${
+//                       visitToday ? "btn-success" : "btn-warning"
+//                     }`}
+//                     onClick={() => updateBooking(false)}
+//                     disabled={checkingIn}
+//                   >
+//                     {checkingIn ? (
+//                       <>
+//                         <span className="spinner-border spinner-border-sm me-2" />
+//                         Updating...
+//                       </>
+//                     ) : (
+//                       <>
+//                         <i className="fa fa-check-circle me-2" />
+//                         Update Status to Complete
+//                       </>
+//                     )}
+//                   </button>
+//                 </div>
+//               </div>
+//             )}
+
+//             {/* SCAN AGAIN */}
+//             <div className="border-top mt-4 pt-4">
+//               <button
+//                 className="btn btn-outline-dark btn-lg w-100"
+//                 onClick={scanAgain}
+//                 disabled={checkingIn}
+//               >
+//                 <i className="fa fa-qrcode me-2" />
+//                 Scan Another Ticket
+//               </button>
+//             </div>
+
+//             {/* RAW RESPONSE (debug) - remove once the API shape is confirmed */}
+//             {rawResponse && (
+//               <details className="mt-4">
+//                 <summary className="text-muted small">API response</summary>
+//                 <pre
+//                   className="bg-light border rounded p-3 mt-2 small mb-0"
+//                   style={{ maxHeight: 260, overflow: "auto" }}
+//                 >
+//                   {JSON.stringify(rawResponse, null, 2)}
+//                 </pre>
+//               </details>
+//             )}
+//           </div>
+//         </div>
+//       )}
+
+//       {/* EMPTY */}
+//       {!scannerOpen && !loading && !booking && !errorMessage && (
+//         <div className="card border-0 shadow-sm">
+//           <div className="card-body text-center py-5 px-3">
+//             <div className="fs-1 mb-3">📱</div>
+//             <h5 className="fw-bold">Ready to Scan</h5>
+//             <p className="text-muted mb-4">
+//               Scan the QR code on the visitor's booking receipt.
+//             </p>
+//             <button
+//               className="btn btn-dark btn-lg w-100"
+//               style={{ maxWidth: "350px" }}
+//               onClick={openScanner}
+//             >
+//               <i className="fa fa-qrcode me-2" />
+//               Start Scanner
+//             </button>
+//           </div>
+//         </div>
+//       )}
+
+//       {/* HIGHER AUTHORITY POPUP */}
+//       {showAuthorityModal && (
+//         <div
+//           role="dialog"
+//           aria-modal="true"
+//           style={{
+//             position: "fixed",
+//             inset: 0,
+//             background: "rgba(0,0,0,0.55)",
+//             zIndex: 2000,
+//             display: "flex",
+//             alignItems: "center",
+//             justifyContent: "center",
+//             padding: "1rem",
+//           }}
+//         >
+//           <div
+//             className="card border-0 shadow"
+//             style={{ width: "100%", maxWidth: 440 }}
+//           >
+//             <div className="card-body p-4">
+//               <div className="d-flex align-items-center gap-2 mb-3">
+//                 <i className="fa fa-user-shield fs-4 text-warning" />
+//                 <h5 className="fw-bold mb-0">Ask Higher Authority</h5>
+//               </div>
+
+//               <p className="mb-4">
+//                 {authorityMessage || "Please refer to higher authority."}
+//               </p>
+
+//               <div className="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+//                 <button
+//                   className="btn btn-outline-secondary"
+//                   onClick={() => setShowAuthorityModal(false)}
+//                 >
+//                   Close
+//                 </button>
+
+//                 {status === "pending" && (
+//                   <button
+//                     className="btn btn-warning"
+//                     onClick={() => updateBooking(true)}
+//                     disabled={checkingIn}
+//                   >
+//                     {checkingIn ? "Updating..." : "Update Status (Authority)"}
+//                   </button>
+//                 )}
+//               </div>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
+// export default ScannerMain;
+
+
+
 import React, { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import axios from "axios";
@@ -2732,6 +3555,8 @@ function ScannerMain() {
   const [errorMessage, setErrorMessage] = useState("");
   const [authorityMessage, setAuthorityMessage] = useState("");
   const [showAuthorityModal, setShowAuthorityModal] = useState(false);
+  const [authorityConfirmable, setAuthorityConfirmable] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState("pending");
 
   const scannerRef = useRef(null);
   const scannedRef = useRef(false);
@@ -2761,6 +3586,7 @@ function ScannerMain() {
     setErrorMessage("");
     setAuthorityMessage("");
     setShowAuthorityModal(false);
+    setAuthorityConfirmable(false);
   };
 
   const openScanner = () => {
@@ -2781,10 +3607,12 @@ function ScannerMain() {
     const next = { ...data, qrType: type, qrId: id, verifyUrl: apiUrl };
 
     setBooking((prev) => (merge && prev ? { ...prev, ...next } : next));
+    setSelectedStatus(getStatus(next) || "pending");
 
     // Pending but not for today -> ask higher authority (popup)
     if (getStatus(next) === "pending" && !isVisitToday(next)) {
       setAuthorityMessage(NOT_TODAY_MESSAGE);
+      setAuthorityConfirmable(false);
       setShowAuthorityModal(true);
     }
 
@@ -2958,27 +3786,13 @@ function ScannerMain() {
 
     const current = getStatus(booking);
 
-    if (current === "completed") return;
-
-    if (current === "cancelled") {
-      setAuthorityMessage(
-        "This booking is cancelled. Please refer to higher authority."
-      );
-      setShowAuthorityModal(true);
-      return;
-    }
-
-    if (current !== "pending") {
-      setAuthorityMessage(
-        "This booking cannot be checked in. Please refer to higher authority."
-      );
-      setShowAuthorityModal(true);
-      return;
-    }
+    // Nothing to change
+    if (!selectedStatus || selectedStatus === current) return;
 
     // Visit date is not today -> popup first, update only after authority confirms
     if (!force && !isVisitToday(booking)) {
       setAuthorityMessage(NOT_TODAY_MESSAGE);
+      setAuthorityConfirmable(true);
       setShowAuthorityModal(true);
       return;
     }
@@ -2990,7 +3804,7 @@ function ScannerMain() {
     try {
       const apiUrl = getApiUrl(type, id);
 
-      const response = await axios.patch(apiUrl, {}, config);
+      const response = await axios.patch(apiUrl, { status: selectedStatus }, config);
       const result = response.data;
 
       console.log("CHECK-IN RESPONSE:", result);
@@ -3024,7 +3838,7 @@ function ScannerMain() {
         }));
       } else {
         // API returned no booking body, but success -> reflect completed locally
-        setBooking((prev) => ({ ...prev, status: "completed" }));
+        setBooking((prev) => ({ ...prev, status: selectedStatus }));
       }
     } catch (error) {
       console.error("CHECK-IN ERROR:", error);
@@ -3340,43 +4154,48 @@ function ScannerMain() {
               </div>
             )}
 
-            {/* UPDATE BUTTON: always visible for pending bookings */}
-            {status === "pending" && (
-              <div className="border-top mt-4 pt-4">
-                <div className="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3">
-                  <div>
-                    <h6 className="fw-bold mb-1">
-                      {visitToday ? "Ready for Check-in" : "Visit date is not today"}
-                    </h6>
-                    <small className="text-muted">
-                      {visitToday
-                        ? "Verify the visitor details before checking in."
-                        : "Higher authority approval is required before updating."}
-                    </small>
-                  </div>
+            {/* UPDATE STATUS: select + button */}
+            <div className="border-top mt-4 pt-4">
+              <h6 className="fw-bold mb-1">Update Status</h6>
+              <small className="text-muted d-block mb-3">
+                {visitToday
+                  ? "Choose the new status and update."
+                  : "Visit date is not today. Higher authority approval is required."}
+              </small>
 
-                  <button
-                    className={`btn btn-lg ${
-                      visitToday ? "btn-success" : "btn-warning"
-                    }`}
-                    onClick={() => updateBooking(false)}
-                    disabled={checkingIn}
-                  >
-                    {checkingIn ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2" />
-                        Updating...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fa fa-check-circle me-2" />
-                        Update Status to Complete
-                      </>
-                    )}
-                  </button>
-                </div>
+              <div className="d-flex flex-column flex-md-row gap-2">
+                <select
+                  className="form-select form-select-lg"
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  disabled={checkingIn}
+                >
+                  <option value="pending">Pending</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+
+                <button
+                  className={`btn btn-lg text-nowrap ${
+                    visitToday ? "btn-success" : "btn-warning"
+                  }`}
+                  onClick={() => updateBooking(false)}
+                  disabled={checkingIn || selectedStatus === status}
+                >
+                  {checkingIn ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fa fa-check-circle me-2" />
+                      Update Status
+                    </>
+                  )}
+                </button>
               </div>
-            )}
+            </div>
 
             {/* SCAN AGAIN */}
             <div className="border-top mt-4 pt-4">
@@ -3460,12 +4279,15 @@ function ScannerMain() {
               <div className="d-flex flex-column flex-sm-row gap-2 justify-content-end">
                 <button
                   className="btn btn-outline-secondary"
-                  onClick={() => setShowAuthorityModal(false)}
+                  onClick={() => {
+                    setShowAuthorityModal(false);
+                    setAuthorityConfirmable(false);
+                  }}
                 >
                   Close
                 </button>
 
-                {status === "pending" && (
+                {authorityConfirmable && (
                   <button
                     className="btn btn-warning"
                     onClick={() => updateBooking(true)}
